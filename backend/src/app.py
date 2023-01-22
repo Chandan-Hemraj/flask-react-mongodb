@@ -12,57 +12,76 @@ mongo = PyMongo(app)
 
 db = mongo.db.users
 
-
-@app.route("/users", methods=["GET"])
+@app.route("/users", methods=["GET","PUT"])
 def get_users():
+    
     users = []
-    for user in db.find():
+    
+    ## Get all users
+    if request.method == "GET":
+        data = db.find()
+    
+    ## Get users by query
+    elif request.method == "PUT":
+        data = db.find(request.json)
+        
+    for user in data:
         users.append({
             "_id": str(user["_id"]),
-            "name": user["name"],
+            "first_name": user["first_name"],
+            "last_name": user["last_name"],
             "email": user["email"],
-            "password": user["password"],
+            "phone": user["phone"],
+            "message": user["message"],
         })
     return jsonify(users)
 
-
-@app.route("/user/<id>", methods=["GET"])
+@app.route("/user/<id>", methods=["GET", "PUT", "DELETE"])
 def get_user(id):
-    user = db.find_one({"_id": ObjectId(id)})
-    if user is not None:
-        user["_id"] = str(user["_id"])
-    else:
-        user = {}
-    return jsonify(user=user)
+    
+    ## Get user by id
+    if request.method == "GET":
+        user = db.find_one({"_id": ObjectId(id)})
+        if user is not None:
+            user["_id"] = str(user["_id"])
+        else:
+            user = {}
+        return jsonify(user=user)
+    
+    ## Update user
+    if request.method == "PUT":
+        db.update_one({'_id': ObjectId(id)}, {
+            "$set" : {
+                "first_name": request.json["first_name"],
+                "last_name": request.json["last_name"],
+                "email": request.json["email"],
+                "phone": request.json["phone"],
+                "message": request.json["message"],
+            }
+        })
+        return jsonify(message="user updated", id=id)
+    
+    ## Delete user
+    if request.method == "DELETE":
+        db.delete_one({'_id': ObjectId(id)})
+        return jsonify(message="user deleted", id=id)
 
-
+## Create user
 @app.route("/user", methods=["POST"])
 def create_user():
     user = db.insert_one({
-        "name": request.json["name"],
+        "first_name": request.json["first_name"],
+        "last_name": request.json["last_name"],
         "email": request.json["email"],
-        "password": request.json["password"],
+        "phone": request.json["phone"],
+        "message": request.json["message"],
     })
     return jsonify(id=str(user.inserted_id), message="user created sucessfully.")
 
-
-@app.route("/user/<id>", methods=["DELETE"])
-def delete_user(id: str):
-    db.delete_one({'_id': ObjectId(id)})
-    return jsonify(message="user deleted", id=id)
-
-
-@app.route("/user/<id>", methods=["PUT"])
-def update_user(id: str):
-    db.update_one({'_id': ObjectId(id)}, {
-        "$set" : {
-            'name': request.json["name"],
-            'email': request.json["email"],
-            'password': request.json["password"]
-        }
-    })
-    return jsonify(message="user updated", id=id)
-
+## send email
+@app.route("/sendemail", methods=["GET"])
+def send_email():
+    return jsonify(message="email sent")
 
 if __name__ == "__main__":
     app.run(debug=True)
